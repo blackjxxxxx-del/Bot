@@ -184,7 +184,14 @@ async function playSong(guild, queue) {
       "pipe:1",
     ]);
     ytdlp.stdout.pipe(ffmpegProcess.stdin);
-    ytdlp.stderr.on("data", () => {});
+    let ytdlpErr = "";
+    ytdlp.stderr.on("data", (d) => { ytdlpErr += d.toString(); });
+    ytdlp.on("close", (code) => {
+      if (code !== 0 && ytdlpErr) {
+        console.error("yt-dlp error:", ytdlpErr.slice(0, 500));
+        queue.textChannel?.send({ embeds: [songEmbed("❌ yt-dlp error", `\`\`\`${ytdlpErr.slice(0, 400)}\`\`\``, 0xed4245)] });
+      }
+    });
     ytdlp.stdout.on("error", () => {});
     ffmpegProcess.stdin.on("error", () => {});
     ffmpegProcess.stdout.on("error", () => {});
