@@ -39,7 +39,7 @@ const ffmpegStatic = require("ffmpeg-static");
 process.env.FFMPEG_PATH = ffmpegStatic;
 const { GoogleGenAI } = require("@google/genai");
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-2.0-flash";
 const geminiModel = genAI.models;
 // เก็บประวัติการสนทนาแต่ละ channel
 const chatHistories = new Map();
