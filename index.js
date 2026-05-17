@@ -165,18 +165,22 @@ async function playSong(guild, queue) {
   queue.playing = true;
 
   try {
-    const ytdlp = spawn(YTDLP, ["-f", "bestaudio/best", "-o", "-", "--no-playlist", "-q", song.url]);
+    queue.textChannel?.send({ embeds: [songEmbed("⏳ กำลังโหลด", `yt-dlp: \`${song.url.slice(0, 80)}\``, 0xfee75c)] });
+    const ytdlp = spawn(YTDLP, ["-f", "bestaudio/best", "-o", "-", "--no-playlist", song.url]);
     const ffmpegProcess = spawn(ffmpegStatic, [
       "-i", "pipe:0", "-analyzeduration", "0", "-loglevel", "0",
       "-c:a", "libopus", "-f", "ogg", "-ar", "48000", "-ac", "2", "-b:a", "128k", "pipe:1",
     ]);
     ytdlp.stdout.pipe(ffmpegProcess.stdin);
     let ytdlpErr = "";
+    let gotData = false;
+    ytdlp.stdout.once("data", () => { gotData = true; });
     ytdlp.stderr.on("data", (d) => { ytdlpErr += d.toString(); });
     ytdlp.on("close", (code) => {
-      if (code !== 0 && ytdlpErr) {
-        console.error("yt-dlp error:", ytdlpErr.slice(0, 500));
-        queue.textChannel?.send({ embeds: [songEmbed("❌ yt-dlp error", `\`\`\`${ytdlpErr.slice(0, 400)}\`\`\``, 0xed4245)] });
+      const msg = ytdlpErr.slice(0, 400) || "(no stderr)";
+      if (code !== 0 || !gotData) {
+        console.error(`yt-dlp exit ${code}, gotData=${gotData}:`, msg);
+        queue.textChannel?.send({ embeds: [songEmbed("❌ yt-dlp exit " + code, `\`\`\`${msg}\`\`\``, 0xed4245)] });
       }
     });
     ytdlp.stdout.on("error", () => {});
