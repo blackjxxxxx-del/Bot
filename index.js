@@ -313,15 +313,17 @@ client.on("messageCreate", async (message) => {
           });
           return;
         }
-        https.get(target, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } }, res => {
+        const req = https.get(target, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } }, res => {
           let d = "";
-          res.on("data", c => { d += c; if (d.length > 800000) res.destroy(); });
-          res.on("end", () => {
+          res.on("data", c => { d += c; if (d.length > 600000) { res.destroy(); } });
+          res.on("close", () => {
             const m = d.match(/"videoId":"([^"]+)"[^}]*?"text":"([^"]+)"/);
-            if (!m) return reject(new Error("ไม่พบเพลงใน YouTube"));
+            if (!m) return reject(new Error(`ค้นหา YouTube ไม่สำเร็จ (HTML ${d.length} bytes)`));
             resolve({ title: m[2], webpage_url: `https://www.youtube.com/watch?v=${m[1]}`, duration: 0 });
           });
-        }).on("error", reject);
+        });
+        req.setTimeout(15000, () => { req.destroy(); reject(new Error("YouTube timeout 15s")); });
+        req.on("error", reject);
       });
 
       const secs = info.duration || 0;
