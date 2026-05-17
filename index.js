@@ -32,20 +32,24 @@ const {
 const play = require("play-dl");
 const { spawn, execSync } = require("child_process");
 const fs = require("fs");
+const path = require("path");
 const which = require("which");
 
 function findBin(name) {
-  if (process.env[`${name.replace("-", "_").toUpperCase()}_PATH`]) return process.env[`${name.replace("-", "_").toUpperCase()}_PATH`];
+  // ตรวจสอบ env variable ก่อน
+  const envKey = name.replace(/-/g, "_").toUpperCase() + "_PATH";
+  if (process.env[envKey]) return process.env[envKey];
+  // ตรวจสอบ project folder (Railway downloads yt-dlp here)
+  const localPath = path.join(__dirname, name);
+  try { fs.accessSync(localPath, fs.constants.X_OK); return localPath; } catch (_) {}
+  // ตรวจสอบ PATH ปกติ
   const w = which.sync(name, { nothrow: true });
   if (w) return w;
+  // ตรวจสอบ shell which
   try {
     const r = execSync(`which ${name} 2>/dev/null || command -v ${name} 2>/dev/null`, { encoding: "utf8", shell: "/bin/sh" }).trim();
     if (r) return r;
   } catch (_) {}
-  for (const dir of ["/usr/local/bin", "/usr/bin", "/run/current-system/sw/bin", "/nix/var/nix/profiles/default/bin", "/home/nixos/.nix-profile/bin"]) {
-    const p = `${dir}/${name}`;
-    try { fs.accessSync(p, fs.constants.X_OK); return p; } catch (_) {}
-  }
   return name;
 }
 
