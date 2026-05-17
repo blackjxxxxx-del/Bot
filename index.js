@@ -30,12 +30,30 @@ const {
   StreamType,
 } = require("@discordjs/voice");
 const play = require("play-dl");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
+const fs = require("fs");
 const which = require("which");
-// หา yt-dlp อัตโนมัติ (รองรับทั้ง Mac และ Linux server)
-const YTDLP = process.env.YTDLP_PATH || which.sync("yt-dlp", { nothrow: true }) || "yt-dlp";
+
+function findBin(name) {
+  if (process.env[`${name.replace("-", "_").toUpperCase()}_PATH`]) return process.env[`${name.replace("-", "_").toUpperCase()}_PATH`];
+  const w = which.sync(name, { nothrow: true });
+  if (w) return w;
+  try {
+    const r = execSync(`which ${name} 2>/dev/null || command -v ${name} 2>/dev/null`, { encoding: "utf8", shell: "/bin/sh" }).trim();
+    if (r) return r;
+  } catch (_) {}
+  for (const dir of ["/usr/local/bin", "/usr/bin", "/run/current-system/sw/bin", "/nix/var/nix/profiles/default/bin", "/home/nixos/.nix-profile/bin"]) {
+    const p = `${dir}/${name}`;
+    try { fs.accessSync(p, fs.constants.X_OK); return p; } catch (_) {}
+  }
+  return name;
+}
+
+const YTDLP = findBin("yt-dlp");
+console.log(`[YTDLP] path: ${YTDLP}`);
 // ใช้ ffmpeg จาก package แทน system ffmpeg
 const ffmpegStatic = require("ffmpeg-static");
+console.log(`[FFMPEG] path: ${ffmpegStatic}`);
 process.env.FFMPEG_PATH = ffmpegStatic;
 // ---------- Vertex AI (Node.js) — เทียบเท่า vertexai.init() ใน Python ----------
 const VERTEX_PROJECT = process.env.VERTEX_PROJECT || "botj-496614";
