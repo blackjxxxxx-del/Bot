@@ -165,8 +165,13 @@ async function playSong(guild, queue) {
   queue.playing = true;
 
   try {
-    queue.textChannel?.send({ embeds: [songEmbed("⏳ กำลังโหลด", `yt-dlp: \`${song.url.slice(0, 80)}\``, 0xfee75c)] });
-    const ytdlp = spawn(YTDLP, ["-f", "bestaudio/best", "-o", "-", "--no-playlist", song.url]);
+    await queue.textChannel?.send({ embeds: [songEmbed("⏳ กำลังโหลด", `\`${song.url.slice(0, 80)}\``, 0xfee75c)] });
+    const ytdlp = spawn(YTDLP, [
+      "-f", "bestaudio/best", "-o", "-", "--no-playlist",
+      "--no-warnings", "--no-check-certificates",
+      "--extractor-args", "youtube:player_client=android",
+      song.url,
+    ]);
     const ffmpegProcess = spawn(ffmpegStatic, [
       "-i", "pipe:0", "-analyzeduration", "0", "-loglevel", "0",
       "-c:a", "libopus", "-f", "ogg", "-ar", "48000", "-ac", "2", "-b:a", "128k", "pipe:1",
@@ -176,6 +181,9 @@ async function playSong(guild, queue) {
     let gotData = false;
     ytdlp.stdout.once("data", () => { gotData = true; });
     ytdlp.stderr.on("data", (d) => { ytdlpErr += d.toString(); });
+    ytdlp.on("error", (err) => {
+      queue.textChannel?.send({ embeds: [songEmbed("❌ yt-dlp ไม่พบ", `\`${err.message}\`\nตรวจสอบว่า yt-dlp ติดตั้งแล้ว`, 0xed4245)] });
+    });
     ytdlp.on("close", (code) => {
       const msg = ytdlpErr.slice(0, 400) || "(no stderr)";
       if (code !== 0 || !gotData) {
@@ -190,7 +198,7 @@ async function playSong(guild, queue) {
     const resource = createAudioResource(ffmpegProcess.stdout, { inputType: StreamType.OggOpus, inlineVolume: true });
     resource.volume?.setVolume(queue.volume / 100);
     queue.player.play(resource);
-    queue.textChannel?.send({
+    await queue.textChannel?.send({
       embeds: [songEmbed("🎶 กำลังเล่น", `**${song.title}**\nขอโดย: ${song.requestedBy}`, 0x57f287)],
     });
   } catch (err) {
