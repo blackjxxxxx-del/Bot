@@ -39,9 +39,9 @@ const ffmpegStatic = require("ffmpeg-static");
 process.env.FFMPEG_PATH = ffmpegStatic;
 // ---------- Vertex AI (Node.js) — เทียบเท่า vertexai.init() ใน Python ----------
 const VERTEX_PROJECT = process.env.VERTEX_PROJECT || "botj-496614";
-const VERTEX_LOCATION = process.env.VERTEX_LOCATION || "us-central1";
-const GEMINI_MODEL = "gemini-2.0-flash";
-const VERTEX_URL = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${VERTEX_PROJECT}/locations/${VERTEX_LOCATION}/publishers/google/models/${GEMINI_MODEL}`;
+const VERTEX_LOCATION = process.env.VERTEX_LOCATION || "global";
+const GEMINI_MODEL = "gemini-3.1-flash-lite";
+const VERTEX_URL = `https://aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/${VERTEX_LOCATION}/publishers/google/models/${GEMINI_MODEL}`;
 
 async function vertexGenerate(contents, systemInstruction) {
   const body = { contents };
