@@ -46,7 +46,7 @@ async function ensureYtDlp() {
   } catch (_) {}
 
   console.log("[YTDLP] downloading from GitHub...");
-  const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+  const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
 
   await new Promise((resolve, reject) => {
     const follow = (u) => {
