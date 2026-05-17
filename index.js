@@ -294,18 +294,34 @@ client.on("messageCreate", async (message) => {
       const isUrl = /^https?:\/\//i.test(query);
       const searchQuery = isUrl ? query : `ytsearch1:${query}`;
 
+      // ค้นหาด้วย YouTube HTML scraping (ไม่ต้องใช้ API key)
       const info = await new Promise((resolve, reject) => {
-        let out = "";
-        const p = spawn(YTDLP, ["--dump-json", "--no-playlist", "-q", "--socket-timeout", "15", searchQuery]);
-        const timer = setTimeout(() => { p.kill(); reject(new Error("yt-dlp timeout — ลอง URL ตรงๆ แทนครับ")); }, 30000);
-        p.stdout.on("data", (d) => { out += d.toString(); });
-        p.stderr.on("data", () => {});
-        p.on("close", (code) => {
-          clearTimeout(timer);
-          if (code !== 0 || !out.trim()) return reject(new Error("yt-dlp ค้นหาไม่พบเพลง"));
-          try { resolve(JSON.parse(out.trim().split("\n")[0])); }
-          catch (e) { reject(e); }
-        });
+        const https = require("https");
+        const target = isUrl ? query : `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+        if (isUrl) {
+          // ถ้าเป็น URL ให้ใช้ yt-dlp dump-json
+          let out = "";
+          const p = spawn(YTDLP, ["--dump-json", "--no-playlist", "-q", "--socket-timeout", "15", query]);
+          const timer = setTimeout(() => { p.kill(); reject(new Error("timeout")); }, 20000);
+          p.stdout.on("data", d => { out += d; });
+          p.stderr.on("data", () => {});
+          p.on("close", code => {
+            clearTimeout(timer);
+            if (!out.trim()) return reject(new Error("ไม่พบข้อมูลวิดีโอ"));
+            try { const j = JSON.parse(out.trim()); resolve({ title: j.title, webpage_url: j.webpage_url, duration: j.duration }); }
+            catch(e) { reject(e); }
+          });
+          return;
+        }
+        https.get(target, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } }, res => {
+          let d = "";
+          res.on("data", c => { d += c; if (d.length > 800000) res.destroy(); });
+          res.on("end", () => {
+            const m = d.match(/"videoId":"([^"]+)"[^}]*?"text":"([^"]+)"/);
+            if (!m) return reject(new Error("ไม่พบเพลงใน YouTube"));
+            resolve({ title: m[2], webpage_url: `https://www.youtube.com/watch?v=${m[1]}`, duration: 0 });
+          });
+        }).on("error", reject);
       });
 
       const secs = info.duration || 0;
