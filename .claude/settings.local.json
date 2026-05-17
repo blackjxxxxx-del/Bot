@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(brew list:*)",
+      "Bash(brew install:*)",
+      "Bash(ffmpeg -version)",
+      "Bash(/opt/homebrew/bin/brew install:*)",
+      "Bash(/opt/homebrew/bin/ffmpeg -version)",
+      "Bash(pm2 list:*)",
+      "Bash(node -e \"const djs = require\\(''/Users/blackjay/Documents/MacBook Pro Jay/Bot/node_modules/discord.js''\\); console.log\\(''discord.js version:'', djs.version\\)\")",
+      "Bash(node index.js)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(kill -0 29691)",
+      "Bash(pkill -f \"node index.js\")",
+      "Read(//tmp/**)",
+      "Bash(sleep 10 && cat /tmp/bot_output.log)",
+      "Bash(awk '{print \"Process still running: PID=\"$2, \"CPU=\"$3\"%\", \"MEM=\"$4\"%\"}')",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require\\('better-sqlite3'\\)\")",
+      "Bash(kill -USR1 30382)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://discord.com/api/v10/gateway)",
+      "Bash(pkill -f bcg5sbimt)",
+      "Bash(echo \"Bot PID: $!\")",
+      "Bash(cat)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)"
+    ]
+  }
+}
