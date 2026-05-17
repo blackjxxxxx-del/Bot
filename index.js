@@ -286,6 +286,8 @@ client.on("messageCreate", async (message) => {
     const queue = getQueue(message.guild.id);
     queue.textChannel = message.channel;
 
+    await message.channel.sendTyping();
+
     // ค้นหาเพลงด้วย yt-dlp (ไม่พึ่ง play-dl ที่ YouTube เปลี่ยน API บ่อย)
     let songInfo;
     try {
@@ -294,10 +296,12 @@ client.on("messageCreate", async (message) => {
 
       const info = await new Promise((resolve, reject) => {
         let out = "";
-        const p = spawn(YTDLP, ["--dump-json", "--no-playlist", "-q", searchQuery]);
+        const p = spawn(YTDLP, ["--dump-json", "--no-playlist", "-q", "--socket-timeout", "15", searchQuery]);
+        const timer = setTimeout(() => { p.kill(); reject(new Error("yt-dlp timeout — ลอง URL ตรงๆ แทนครับ")); }, 30000);
         p.stdout.on("data", (d) => { out += d.toString(); });
         p.stderr.on("data", () => {});
         p.on("close", (code) => {
+          clearTimeout(timer);
           if (code !== 0 || !out.trim()) return reject(new Error("yt-dlp ค้นหาไม่พบเพลง"));
           try { resolve(JSON.parse(out.trim().split("\n")[0])); }
           catch (e) { reject(e); }
