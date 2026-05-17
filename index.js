@@ -165,23 +165,10 @@ async function playSong(guild, queue) {
   queue.playing = true;
 
   try {
-    const ytdlp = spawn(YTDLP, [
-      "-f", "bestaudio",
-      "-o", "-",
-      "--no-playlist",
-      "-q",
-      song.url,
-    ]);
+    const ytdlp = spawn(YTDLP, ["-f", "bestaudio/best", "-o", "-", "--no-playlist", "-q", song.url]);
     const ffmpegProcess = spawn(ffmpegStatic, [
-      "-i", "pipe:0",
-      "-analyzeduration", "0",
-      "-loglevel", "0",
-      "-c:a", "libopus",
-      "-f", "ogg",
-      "-ar", "48000",
-      "-ac", "2",
-      "-b:a", "128k",
-      "pipe:1",
+      "-i", "pipe:0", "-analyzeduration", "0", "-loglevel", "0",
+      "-c:a", "libopus", "-f", "ogg", "-ar", "48000", "-ac", "2", "-b:a", "128k", "pipe:1",
     ]);
     ytdlp.stdout.pipe(ffmpegProcess.stdin);
     let ytdlpErr = "";
@@ -196,22 +183,11 @@ async function playSong(guild, queue) {
     ffmpegProcess.stdin.on("error", () => {});
     ffmpegProcess.stdout.on("error", () => {});
     ffmpegProcess.stderr.on("data", () => {});
-    const resource = createAudioResource(ffmpegProcess.stdout, {
-      inputType: StreamType.OggOpus,
-      inlineVolume: true,
-    });
+    const resource = createAudioResource(ffmpegProcess.stdout, { inputType: StreamType.OggOpus, inlineVolume: true });
     resource.volume?.setVolume(queue.volume / 100);
-
     queue.player.play(resource);
-
     queue.textChannel?.send({
-      embeds: [
-        songEmbed(
-          "🎶 กำลังเล่น",
-          `**[${song.title}](${song.url})**\nความยาว: \`${song.duration}\`\nขอโดย: ${song.requestedBy}`,
-          0x57f287
-        ),
-      ],
+      embeds: [songEmbed("🎶 กำลังเล่น", `**${song.title}**\nขอโดย: ${song.requestedBy}`, 0x57f287)],
     });
   } catch (err) {
     console.error("Error playing song:", err);
@@ -286,63 +262,14 @@ client.on("messageCreate", async (message) => {
     const queue = getQueue(message.guild.id);
     queue.textChannel = message.channel;
 
-    await message.channel.sendTyping();
-
-    // ค้นหาเพลงด้วย yt-dlp (ไม่พึ่ง play-dl ที่ YouTube เปลี่ยน API บ่อย)
-    let songInfo;
-    try {
-      const isUrl = /^https?:\/\//i.test(query);
-      const searchQuery = isUrl ? query : `ytsearch1:${query}`;
-
-      // ค้นหาด้วย YouTube HTML scraping (ไม่ต้องใช้ API key)
-      const info = await new Promise((resolve, reject) => {
-        const https = require("https");
-        const target = isUrl ? query : `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-        if (isUrl) {
-          // ถ้าเป็น URL ให้ใช้ yt-dlp dump-json
-          let out = "";
-          const p = spawn(YTDLP, ["--dump-json", "--no-playlist", "-q", "--socket-timeout", "15", query]);
-          const timer = setTimeout(() => { p.kill(); reject(new Error("timeout")); }, 20000);
-          p.stdout.on("data", d => { out += d; });
-          p.stderr.on("data", () => {});
-          p.on("close", code => {
-            clearTimeout(timer);
-            if (!out.trim()) return reject(new Error("ไม่พบข้อมูลวิดีโอ"));
-            try { const j = JSON.parse(out.trim()); resolve({ title: j.title, webpage_url: j.webpage_url, duration: j.duration }); }
-            catch(e) { reject(e); }
-          });
-          return;
-        }
-        const req = https.get(target, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } }, res => {
-          let d = "";
-          res.on("data", c => { d += c; if (d.length > 600000) { res.destroy(); } });
-          res.on("close", () => {
-            const m = d.match(/"videoRenderer":\{"videoId":"([a-zA-Z0-9_-]{11})".*?"title":\{"runs":\[\{"text":"([^"]+)"/s);
-            if (!m) return reject(new Error(`ค้นหา YouTube ไม่สำเร็จ (HTML ${d.length} bytes)`));
-            resolve({ title: m[2], webpage_url: `https://www.youtube.com/watch?v=${m[1]}`, duration: 0 });
-          });
-        });
-        req.setTimeout(15000, () => { req.destroy(); reject(new Error("YouTube timeout 15s")); });
-        req.on("error", reject);
-      });
-
-      const secs = info.duration || 0;
-      const dur = secs > 0 ? `${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}` : "N/A";
-      songInfo = {
-        title: info.title || query,
-        url: info.webpage_url || info.url,
-        duration: dur,
-        thumbnail: info.thumbnail || null,
-        requestedBy: message.author.toString(),
-      };
-    } catch (err) {
-      console.error("Search error:", err);
-      return message.reply({
-        embeds: [
-          songEmbed("❌ ค้นหาไม่สำเร็จ", `\`${err.message}\``, 0xed4245),
-        ],
-      });
-    }
+    // ส่ง query ตรงไปให้ yt-dlp จัดการ (ytsearch1: หรือ URL)
+    const isUrl = /^https?:\/\//i.test(query);
+    const songInfo = {
+      title: query,
+      url: isUrl ? query : `ytsearch1:${query}`,
+      duration: "N/A",
+      requestedBy: message.author.toString(),
+    };
 
     queue.songs.push(songInfo);
 
