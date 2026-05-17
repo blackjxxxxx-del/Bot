@@ -31,6 +31,38 @@ const {
 } = require("@discordjs/voice");
 const play = require("play-dl");
 const { spawn } = require("child_process");
+const https = require("https");
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const YTDLP_PATH = path.join(__dirname, "yt-dlp");
+
+async function ensureYtDlp() {
+  try {
+    fs.accessSync(YTDLP_PATH, fs.constants.X_OK);
+    console.log("[YTDLP] already exists:", YTDLP_PATH);
+    return;
+  } catch (_) {}
+
+  console.log("[YTDLP] downloading from GitHub...");
+  const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+
+  await new Promise((resolve, reject) => {
+    const follow = (u) => {
+      const mod = u.startsWith("https") ? https : http;
+      mod.get(u, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) return follow(res.headers.location);
+        if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode} from ${u}`));
+        const file = fs.createWriteStream(YTDLP_PATH);
+        res.pipe(file);
+        file.on("finish", () => { file.close(); fs.chmodSync(YTDLP_PATH, "755"); console.log("[YTDLP] download OK"); resolve(); });
+        file.on("error", reject);
+      }).on("error", reject);
+    };
+    follow(url);
+  });
+}
 // ใช้ ffmpeg จาก package แทน system ffmpeg
 const ffmpegStatic = require("ffmpeg-static");
 process.env.FFMPEG_PATH = ffmpegStatic;
@@ -163,12 +195,12 @@ async function playSong(guild, queue) {
 
   try {
     await queue.textChannel?.send({ embeds: [songEmbed("⏳ กำลังโหลด", `\`${song.url.slice(0, 80)}\``, 0xfee75c)] });
-    const ytdlp = spawn("yt-dlp", [
+    const ytdlp = spawn(YTDLP_PATH, [
       "-f", "bestaudio/best", "-o", "-", "--no-playlist",
       "--no-warnings", "--no-check-certificates",
       "--extractor-args", "youtube:player_client=android",
       song.url,
-    ], { shell: true });
+    ]);
     const ffmpegProcess = spawn(ffmpegStatic, [
       "-i", "pipe:0", "-analyzeduration", "0", "-loglevel", "0",
       "-c:a", "libopus", "-f", "ogg", "-ar", "48000", "-ac", "2", "-b:a", "128k", "pipe:1",
@@ -1071,8 +1103,10 @@ client.on("messageCreate", async (message) => {
 // ---------- Login ----------
 if (!TOKEN) {
   console.error("❌ กรุณาตั้งค่า DISCORD_TOKEN ก่อน!");
-  console.error("   วิธี: DISCORD_TOKEN=your_token_here node index.js");
   process.exit(1);
 }
 
-client.login(TOKEN);
+(async () => {
+  await ensureYtDlp();
+  client.login(TOKEN);
+})();
