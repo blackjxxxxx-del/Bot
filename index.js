@@ -30,34 +30,9 @@ const {
   StreamType,
 } = require("@discordjs/voice");
 const play = require("play-dl");
-const { spawn, execSync } = require("child_process");
-const fs = require("fs");
-const path = require("path");
-const which = require("which");
-
-function findBin(name) {
-  // ตรวจสอบ env variable ก่อน
-  const envKey = name.replace(/-/g, "_").toUpperCase() + "_PATH";
-  if (process.env[envKey]) return process.env[envKey];
-  // ตรวจสอบ project folder (Railway downloads yt-dlp here)
-  const localPath = path.join(__dirname, name);
-  try { fs.accessSync(localPath, fs.constants.X_OK); return localPath; } catch (_) {}
-  // ตรวจสอบ PATH ปกติ
-  const w = which.sync(name, { nothrow: true });
-  if (w) return w;
-  // ตรวจสอบ shell which
-  try {
-    const r = execSync(`which ${name} 2>/dev/null || command -v ${name} 2>/dev/null`, { encoding: "utf8", shell: "/bin/sh" }).trim();
-    if (r) return r;
-  } catch (_) {}
-  return name;
-}
-
-const YTDLP = findBin("yt-dlp");
-console.log(`[YTDLP] path: ${YTDLP}`);
+const { spawn } = require("child_process");
 // ใช้ ffmpeg จาก package แทน system ffmpeg
 const ffmpegStatic = require("ffmpeg-static");
-console.log(`[FFMPEG] path: ${ffmpegStatic}`);
 process.env.FFMPEG_PATH = ffmpegStatic;
 // ---------- Vertex AI (Node.js) — เทียบเท่า vertexai.init() ใน Python ----------
 const VERTEX_PROJECT = process.env.VERTEX_PROJECT || "botj-496614";
@@ -188,12 +163,12 @@ async function playSong(guild, queue) {
 
   try {
     await queue.textChannel?.send({ embeds: [songEmbed("⏳ กำลังโหลด", `\`${song.url.slice(0, 80)}\``, 0xfee75c)] });
-    const ytdlp = spawn(YTDLP, [
+    const ytdlp = spawn("yt-dlp", [
       "-f", "bestaudio/best", "-o", "-", "--no-playlist",
       "--no-warnings", "--no-check-certificates",
       "--extractor-args", "youtube:player_client=android",
       song.url,
-    ]);
+    ], { shell: true });
     const ffmpegProcess = spawn(ffmpegStatic, [
       "-i", "pipe:0", "-analyzeduration", "0", "-loglevel", "0",
       "-c:a", "libopus", "-f", "ogg", "-ar", "48000", "-ac", "2", "-b:a", "128k", "pipe:1",

@@ -1,11 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg", "curl"]
+nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg"]
 
 [phases.install]
-cmds = [
-  "npm install",
-  "curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./yt-dlp && chmod +x ./yt-dlp && echo 'yt-dlp OK' || echo 'yt-dlp download FAILED'"
-]
+cmds = ["npm install"]
 
 [start]
 cmd = "node index.js"
