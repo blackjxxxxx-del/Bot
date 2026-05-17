@@ -37,10 +37,41 @@ const YTDLP = process.env.YTDLP_PATH || which.sync("yt-dlp", { nothrow: true }) 
 // ใช้ ffmpeg จาก package แทน system ffmpeg
 const ffmpegStatic = require("ffmpeg-static");
 process.env.FFMPEG_PATH = ffmpegStatic;
-const { GoogleGenAI } = require("@google/genai");
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// ---------- Vertex AI (Node.js) — เทียบเท่า vertexai.init() ใน Python ----------
+const VERTEX_PROJECT = process.env.VERTEX_PROJECT || "botj-496614";
+const VERTEX_LOCATION = process.env.VERTEX_LOCATION || "us-central1";
 const GEMINI_MODEL = "gemini-2.0-flash";
-const geminiModel = genAI.models;
+const VERTEX_URL = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${VERTEX_PROJECT}/locations/${VERTEX_LOCATION}/publishers/google/models/${GEMINI_MODEL}`;
+
+async function vertexGenerate(contents, systemInstruction) {
+  const body = { contents };
+  if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  const res = await fetch(`${VERTEX_URL}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(JSON.stringify(data.error || data));
+  return data.candidates[0].content.parts[0].text;
+}
+
+// wrapper สำหรับให้โค้ดส่วนล่างเรียกใช้แบบเดิม
+const genAI = {
+  models: {
+    generateContent: async ({ contents }) => ({ text: await vertexGenerate([{ role: "user", parts: [{ text: contents }] }]) }),
+  },
+  chats: {
+    create: ({ history, config }) => ({
+      sendMessage: async ({ message }) => ({
+        text: await vertexGenerate(
+          [...(history || []), { role: "user", parts: [{ text: message }] }],
+          config?.systemInstruction
+        ),
+      }),
+    }),
+  },
+};
 // เก็บประวัติการสนทนาแต่ละ channel
 const chatHistories = new Map();
 // เก็บ vote skip แต่ละ guild
@@ -981,11 +1012,11 @@ client.on("messageCreate", async (message) => {
   if (Math.random() > 0.15) return;
 
   try {
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-    const result = await model.generateContent(
-      `วิเคราะห์ความรู้สึกของข้อความนี้: "${message.content}" ตอบด้วย emoji เดียวเท่านั้น เลือกจาก: 😂 😢 😡 😍 😮 👍 เท่านั้น`
-    );
-    const emoji = result.response.text().trim().match(/[\p{Emoji}]/u)?.[0];
+    const result = await genAI.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: `วิเคราะห์ความรู้สึกของข้อความนี้: "${message.content}" ตอบด้วย emoji เดียวเท่านั้น เลือกจาก: 😂 😢 😡 😍 😮 👍 เท่านั้น`,
+    });
+    const emoji = result.text?.trim().match(/[\p{Emoji}]/u)?.[0];
     if (emoji) await message.react(emoji);
   } catch (_) {}
 });
