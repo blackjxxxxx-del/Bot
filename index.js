@@ -37,10 +37,10 @@ const YTDLP = process.env.YTDLP_PATH || which.sync("yt-dlp", { nothrow: true }) 
 // ใช้ ffmpeg จาก package แทน system ffmpeg
 const ffmpegStatic = require("ffmpeg-static");
 process.env.FFMPEG_PATH = ffmpegStatic;
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const { GoogleGenAI } = require("@google/genai");
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const GEMINI_MODEL = "gemini-2.5-flash";
-const geminiModel = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+const geminiModel = genAI.models;
 // เก็บประวัติการสนทนาแต่ละ channel
 const chatHistories = new Map();
 // เก็บ vote skip แต่ละ guild
@@ -892,9 +892,8 @@ client.on("messageCreate", async (message) => {
 
     await message.channel.sendTyping();
     try {
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      const result = await model.generateContent(`หา lyrics เพลง "${songName}" มาให้หน่อย ถ้าเป็นเพลงไทยให้ใส่ภาษาไทย ถ้าไม่รู้จักเพลงให้บอกตรงๆ อย่าแต่งเอง`);
-      const lyrics = result.response.text();
+      const result = await genAI.models.generateContent({ model: GEMINI_MODEL, contents: `หา lyrics เพลง "${songName}" มาให้หน่อย ถ้าเป็นเพลงไทยให้ใส่ภาษาไทย ถ้าไม่รู้จักเพลงให้บอกตรงๆ อย่าแต่งเอง` });
+      const lyrics = result.text;
       const chunks = lyrics.match(/[\s\S]{1,1900}/g) || [lyrics];
       for (const chunk of chunks.slice(0, 3)) {
         await message.channel.send({ embeds: [songEmbed(`🎤 Lyrics: ${songName}`, chunk, 0x5865f2)] });
@@ -913,9 +912,8 @@ client.on("messageCreate", async (message) => {
 
     try {
       // แปลงเป็น English ก่อนเพื่อให้ได้ผลดีขึ้น
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      const translated = await model.generateContent(`แปลคำอธิบายนี้เป็นภาษาอังกฤษสำหรับ AI สร้างรูป ตอบแค่ประโยคเดียว: "${prompt}"`);
-      const englishPrompt = translated.response.text().trim();
+      const translated = await genAI.models.generateContent({ model: GEMINI_MODEL, contents: `แปลคำอธิบายนี้เป็นภาษาอังกฤษสำหรับ AI สร้างรูป ตอบแค่ประโยคเดียว: "${prompt}"` });
+      const englishPrompt = translated.text.trim();
 
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(englishPrompt)}?width=1024&height=1024&nologo=true&enhance=true`;
 
@@ -952,9 +950,8 @@ client.on("messageCreate", async (message) => {
     if (!text) return message.reply({ embeds: [songEmbed("❗", "ใส่ข้อความที่ต้องการแปล เช่น `!แปล hello world`", 0xfee75c)] });
     await message.channel.sendTyping();
     try {
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      const result = await model.generateContent(`แปลข้อความนี้เป็นภาษาไทย (ถ้าเป็นไทยอยู่แล้วให้แปลเป็นอังกฤษ): "${text}" ตอบแค่คำแปลอย่างเดียว ไม่ต้องอธิบาย`);
-      message.channel.send({ embeds: [songEmbed("🌐 แปลภาษา", `**ต้นฉบับ:** ${text}\n**แปล:** ${result.response.text()}`, 0x5865f2)] });
+      const result = await genAI.models.generateContent({ model: GEMINI_MODEL, contents: `แปลข้อความนี้เป็นภาษาไทย (ถ้าเป็นไทยอยู่แล้วให้แปลเป็นอังกฤษ): "${text}" ตอบแค่คำแปลอย่างเดียว ไม่ต้องอธิบาย` });
+      message.channel.send({ embeds: [songEmbed("🌐 แปลภาษา", `**ต้นฉบับ:** ${text}\n**แปล:** ${result.text}`, 0x5865f2)] });
     } catch (e) {
       message.reply({ embeds: [songEmbed("❌ Error", e.message, 0xed4245)] });
     }
@@ -966,9 +963,8 @@ client.on("messageCreate", async (message) => {
     try {
       const messages = await message.channel.messages.fetch({ limit: 50 });
       const text = messages.reverse().map(m => `${m.author.displayName}: ${m.content}`).filter(t => t.length > 5).join("\n");
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      const result = await model.generateContent(`สรุปการสนทนานี้ให้กระชับเป็นภาษาไทย:\n${text}`);
-      message.channel.send({ embeds: [songEmbed("📝 สรุปการสนทนา", result.response.text(), 0x5865f2)] });
+      const result = await genAI.models.generateContent({ model: GEMINI_MODEL, contents: `สรุปการสนทนานี้ให้กระชับเป็นภาษาไทย:\n${text}` });
+      message.channel.send({ embeds: [songEmbed("📝 สรุปการสนทนา", result.text, 0x5865f2)] });
     } catch (e) {
       message.reply({ embeds: [songEmbed("❌ Error", e.message, 0xed4245)] });
     }
@@ -1049,14 +1045,16 @@ client.on("messageCreate", async (message) => {
     const userMemory = memRow?.memory || "";
 
     const now = new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "full", timeStyle: "short" });
-    const chatModel = genAI.getGenerativeModel({
+    const chat = genAI.chats.create({
       model: GEMINI_MODEL,
-      systemInstruction: `คุณคือแจ๊บ บอทผู้ช่วยในเซิร์ฟเวอร์ Discord ตอบภาษาไทยเป็นหลัก ใช้ภาษาสบายๆ เป็นกันเอง ห้ามตอบยาวเกินไป\nเวลาและวันที่ปัจจุบัน (ไทย): ${now}${userMemory ? `\n\nข้อมูลเกี่ยวกับผู้ใช้คนนี้: ${userMemory}` : ""}`,
+      history,
+      config: {
+        systemInstruction: `คุณคือแจ๊บ บอทผู้ช่วยในเซิร์ฟเวอร์ Discord ตอบภาษาไทยเป็นหลัก ใช้ภาษาสบายๆ เป็นกันเอง ห้ามตอบยาวเกินไป\nเวลาและวันที่ปัจจุบัน (ไทย): ${now}${userMemory ? `\n\nข้อมูลเกี่ยวกับผู้ใช้คนนี้: ${userMemory}` : ""}`,
+      },
     });
-    const chat = chatModel.startChat({ history });
 
-    const result = await chat.sendMessage(`[${message.author.displayName || message.author.username}]: ${userText}`);
-    const reply = result.response.text();
+    const result = await chat.sendMessage({ message: `[${message.author.displayName || message.author.username}]: ${userText}` });
+    const reply = result.text;
 
     // บันทึกประวัติใน memory และ DB
     history.push({ role: "user", parts: [{ text: `[${message.author.displayName || message.author.username}]: ${userText}` }] });
@@ -1071,10 +1069,9 @@ client.on("messageCreate", async (message) => {
     // อัปเดตความจำผู้ใช้อัตโนมัติทุก 3 ข้อความ (6 entries = 3 รอบ user+model)
     if (history.length % 6 === 0) {
       try {
-        const m = genAI.getGenerativeModel({ model: GEMINI_MODEL });
         const existing = db.prepare("SELECT memory FROM user_memory WHERE user_id = ? AND guild_id = ?").get(message.author.id, message.guild.id);
-        const mem = await m.generateContent(`จากการสนทนานี้ สรุปและอัปเดตข้อมูลสำคัญเกี่ยวกับผู้ใช้ชื่อ "${message.author.displayName || message.author.username}" ให้กระชับ รวมกับข้อมูลเดิม:\n\nข้อมูลเดิม: ${existing?.memory || "ไม่มี"}\n\nบทสนทนาล่าสุด:\n${history.slice(-6).map(h => h.parts[0].text).join("\n")}`);
-        db.prepare("INSERT OR REPLACE INTO user_memory (user_id, guild_id, memory) VALUES (?, ?, ?)").run(message.author.id, message.guild.id, mem.response.text());
+        const mem = await genAI.models.generateContent({ model: GEMINI_MODEL, contents: `จากการสนทนานี้ สรุปและอัปเดตข้อมูลสำคัญเกี่ยวกับผู้ใช้ชื่อ "${message.author.displayName || message.author.username}" ให้กระชับ รวมกับข้อมูลเดิม:\n\nข้อมูลเดิม: ${existing?.memory || "ไม่มี"}\n\nบทสนทนาล่าสุด:\n${history.slice(-6).map(h => h.parts[0].text).join("\n")}` });
+        db.prepare("INSERT OR REPLACE INTO user_memory (user_id, guild_id, memory) VALUES (?, ?, ?)").run(message.author.id, message.guild.id, mem.text);
       } catch (_) {}
     }
 
