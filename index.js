@@ -286,43 +286,31 @@ client.on("messageCreate", async (message) => {
     const queue = getQueue(message.guild.id);
     queue.textChannel = message.channel;
 
-    // ค้นหาเพลง
+    // ค้นหาเพลงด้วย yt-dlp (ไม่พึ่ง play-dl ที่ YouTube เปลี่ยน API บ่อย)
     let songInfo;
     try {
-      let searchResult;
+      const isUrl = /^https?:\/\//i.test(query);
+      const searchQuery = isUrl ? query : `ytsearch1:${query}`;
 
-      if (play.yt_validate(query) === "video") {
-        // ถ้าเป็น YouTube URL
-        const info = await play.video_info(query);
-        searchResult = info.video_details;
-      } else {
-        // ค้นหาจากชื่อ
-        const results = await play.search(query, { limit: 1 });
-        if (!results || results.length === 0) {
-          return message.reply({
-            embeds: [
-              songEmbed("❌ ไม่พบเพลง", `ไม่พบผลลัพธ์สำหรับ: \`${query}\``, 0xed4245),
-            ],
-          });
-        }
-        searchResult = results[0];
-      }
-
-      const videoUrl =
-        searchResult.url ||
-        (searchResult.id ? `https://www.youtube.com/watch?v=${searchResult.id}` : null);
-
-      if (!videoUrl) {
-        return message.reply({
-          embeds: [songEmbed("❌ ไม่พบ URL ของเพลง", "ลองใช้ YouTube URL โดยตรงแทนครับ", 0xed4245)],
+      const info = await new Promise((resolve, reject) => {
+        let out = "";
+        const p = spawn(YTDLP, ["--dump-json", "--no-playlist", "-q", searchQuery]);
+        p.stdout.on("data", (d) => { out += d.toString(); });
+        p.stderr.on("data", () => {});
+        p.on("close", (code) => {
+          if (code !== 0 || !out.trim()) return reject(new Error("yt-dlp ค้นหาไม่พบเพลง"));
+          try { resolve(JSON.parse(out.trim().split("\n")[0])); }
+          catch (e) { reject(e); }
         });
-      }
+      });
 
+      const secs = info.duration || 0;
+      const dur = secs > 0 ? `${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}` : "N/A";
       songInfo = {
-        title: searchResult.title,
-        url: videoUrl,
-        duration: searchResult.durationRaw || "N/A",
-        thumbnail: searchResult.thumbnails?.[0]?.url || null,
+        title: info.title || query,
+        url: info.webpage_url || info.url,
+        duration: dur,
+        thumbnail: info.thumbnail || null,
         requestedBy: message.author.toString(),
       };
     } catch (err) {
