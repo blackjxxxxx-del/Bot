@@ -975,13 +975,14 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-// ---------- Sentiment Analysis (react อัตโนมัติ) ----------
+// ---------- Sentiment Analysis (ปิดไว้เพื่อประหยัด API quota) ----------
 client.on("messageCreate", async (message) => {
+  return; // ปิดชั่วคราว
   if (message.author.bot) return;
   if (!message.guild) return;
   if (message.content.startsWith(PREFIX)) return;
   if (message.content.length < 5) return;
-  if (Math.random() > 0.15) return; // วิเคราะห์แค่ 15% ของข้อความ
+  if (Math.random() > 0.15) return;
 
   try {
     const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
