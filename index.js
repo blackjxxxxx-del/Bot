@@ -317,7 +317,7 @@ client.on("messageCreate", async (message) => {
           let d = "";
           res.on("data", c => { d += c; if (d.length > 600000) { res.destroy(); } });
           res.on("close", () => {
-            const m = d.match(/"videoId":"([^"]+)"[^}]*?"text":"([^"]+)"/);
+            const m = d.match(/"videoRenderer":\{"videoId":"([a-zA-Z0-9_-]{11})".*?"title":\{"runs":\[\{"text":"([^"]+)"/s);
             if (!m) return reject(new Error(`ค้นหา YouTube ไม่สำเร็จ (HTML ${d.length} bytes)`));
             resolve({ title: m[2], webpage_url: `https://www.youtube.com/watch?v=${m[1]}`, duration: 0 });
           });
