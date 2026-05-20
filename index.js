@@ -66,20 +66,16 @@ async function ensureYtDlp() {
 // ใช้ ffmpeg จาก package แทน system ffmpeg
 const ffmpegStatic = require("ffmpeg-static");
 process.env.FFMPEG_PATH = ffmpegStatic;
-// ---------- Vertex AI (Node.js) — เทียบเท่า vertexai.init() ใน Python ----------
-const VERTEX_PROJECT = process.env.VERTEX_PROJECT || "botj-496614";
-const VERTEX_LOCATION = process.env.VERTEX_LOCATION || "global";
-const GEMINI_MODEL = "gemini-3.1-flash-lite";
-const VERTEX_URL = `https://aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/${VERTEX_LOCATION}/publishers/google/models/${GEMINI_MODEL}`;
+// ---------- Google AI Studio (generativelanguage.googleapis.com) ----------
+const GEMINI_MODEL = "gemini-2.0-flash-lite";
 
 async function vertexGenerate(contents, systemInstruction) {
   const body = { contents };
   if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
-  const res = await fetch(`${VERTEX_URL}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
-    body: JSON.stringify(body),
-  });
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+  );
   const data = await res.json();
   if (!res.ok) throw new Error(JSON.stringify(data.error || data));
   return data.candidates[0].content.parts[0].text;
